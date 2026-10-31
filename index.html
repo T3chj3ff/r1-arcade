@@ -65,13 +65,16 @@ function show(i) {
 
 /* ---------- accelerometer (normalised -1..1 per Rabbit's SDK docs) ---------- */
 const tilt = { x: 0, y: 0, z: 1 }; let live = false, shakeUntil = 0, lastMag = null;
+const SHAKE_AT = 0.9; let shakeE = 0;  // lower SHAKE_AT = easier to shake (scope screen shows live "shake" level)
 const Y_SIGN = 1;  // flip to -1 if the ball rolls the wrong way up/down on the real device
 function onAccel(d) {
   live = true;
   tilt.x += (d.x - tilt.x) * .3; tilt.y += (d.y * Y_SIGN - tilt.y) * .3; tilt.z = d.z;
-  const m = Math.abs(d.x) + Math.abs(d.y) + Math.abs(d.z);
-  if (lastMag !== null && Math.abs(m - lastMag) > 0.7) shakeUntil = performance.now() + 1400;
-  lastMag = m;
+  if (lastMag !== null) {   // shake = lots of change between raw readings, building up and decaying
+    shakeE = shakeE * 0.88 + Math.hypot(d.x - lastMag.x, d.y - lastMag.y, d.z - lastMag.z);
+    if (shakeE > SHAKE_AT) shakeUntil = performance.now() + 1400;
+  }
+  lastMag = { x: d.x, y: d.y, z: d.z };
 }
 try { if (window.creationSensors) creationSensors.accelerometer.start(onAccel, { frequency: 60 }); } catch (e) {}
 window.addEventListener('mousemove', e => { if (live) return; tilt.x = (e.clientX / W - .5) * 2; tilt.y = (e.clientY / 282 - .5) * 2; });
@@ -214,7 +217,7 @@ function drawScope() {
   g.lineWidth = 2; g.shadowBlur = 6;
   for (const k of 'xyz') { g.strokeStyle = g.shadowColor = cols[k]; g.beginPath(); trace[k].forEach((v, i) => { const px = i * 2, py = 131 - v * 100; i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.stroke(); }
   g.shadowBlur = 0;
-  hud.textContent = `X ${tilt.x.toFixed(2)}  Y ${tilt.y.toFixed(2)}  Z ${tilt.z.toFixed(2)}${live ? '' : '  (mouse)'}`;
+  hud.textContent = `X ${tilt.x.toFixed(2)}  Y ${tilt.y.toFixed(2)}  Z ${tilt.z.toFixed(2)}${live ? '' : '  (mouse)'}\nshake ${shakeE.toFixed(2)} / ${SHAKE_AT}`;
 }
 
 /* ---------- 6: secret-code lab ---------- */
